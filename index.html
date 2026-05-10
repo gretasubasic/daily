@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Reflect" />
+  <title>Daily Reflection</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f5f4f0;
+      color: #1a1a1a;
+      min-height: 100vh;
+      padding: 1.5rem 1rem 3rem;
+    }
+
+    h1 { font-size: 18px; font-weight: 600; margin-bottom: 4px; letter-spacing: -0.3px; }
+    .subtitle { font-size: 13px; color: #888; margin-bottom: 1.5rem; }
+
+    .card {
+      background: #fff;
+      border-radius: 14px;
+      padding: 1rem 1.1rem;
+      margin-bottom: 10px;
+      border: 1px solid #ebebeb;
+    }
+
+    .goal-title { font-size: 15px; font-weight: 600; margin-bottom: 10px; color: #111; }
+
+    .row { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 6px; }
+
+    .badge {
+      font-size: 11px; font-weight: 600; border-radius: 5px;
+      padding: 2px 7px; white-space: nowrap; margin-top: 2px;
+    }
+    .badge-do { background: #e6f4ea; color: #2d7a3a; }
+    .badge-dont { background: #fdecea; color: #c0392b; }
+
+    .row-text { font-size: 13px; color: #555; line-height: 1.5; }
+
+    label {
+      display: block; font-size: 11px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.5px;
+      color: #999; margin-bottom: 4px;
+    }
+
+    input[type="text"], textarea {
+      width: 100%; font-size: 14px;
+      border: 1px solid #e0e0e0; border-radius: 9px;
+      padding: 9px 11px; background: #fff; color: #1a1a1a;
+      outline: none; font-family: inherit; resize: none;
+    }
+    input[type="text"]:focus, textarea:focus { border-color: #aaa; }
+
+    .field { margin-bottom: 10px; }
+
+    .goal-block {
+      background: #fff; border: 1px solid #ebebeb;
+      border-radius: 14px; padding: 1rem 1.1rem; margin-bottom: 10px;
+    }
+
+    .goal-block-header {
+      display: flex; justify-content: space-between;
+      align-items: center; margin-bottom: 12px;
+    }
+
+    .goal-num { font-size: 12px; font-weight: 600; color: #bbb; }
+
+    button {
+      font-family: inherit; cursor: pointer;
+      border: 1px solid #ddd; border-radius: 9px;
+      background: #fff; color: #1a1a1a;
+      font-size: 14px; padding: 10px 16px;
+    }
+    button:active { background: #f0f0f0; }
+
+    .btn-primary {
+      background: #1a1a1a; color: #fff; border-color: #1a1a1a;
+      width: 100%; font-size: 15px; font-weight: 600;
+      padding: 13px; margin-top: 4px;
+    }
+    .btn-primary:active { background: #333; }
+
+    .btn-remove { padding: 4px 10px; font-size: 12px; color: #bbb; border-color: #eee; }
+    .btn-add { font-size: 13px; color: #555; padding: 8px 14px; margin-bottom: 12px; }
+
+    .actions { display: flex; gap: 8px; margin-top: 1rem; }
+    .actions button { flex: 1; font-size: 13px; }
+
+    .hint { text-align: center; font-size: 11px; color: #bbb; margin-top: 1.25rem; }
+
+    #setup, #result { display: none; }
+  </style>
+</head>
+<body>
+
+  <h1>Daily Reflection</h1>
+  <p class="subtitle" id="time-label">Good morning</p>
+
+  <div id="setup">
+    <div id="goals-list"></div>
+    <button class="btn-add" onclick="addGoal()">+ add goal</button>
+    <button class="btn-primary" onclick="saveAndShow()">Save &amp; show reminders</button>
+  </div>
+
+  <div id="result">
+    <div id="result-content"></div>
+    <div class="actions">
+      <button onclick="showSetup()">Edit goals</button>
+    </div>
+    <p class="hint">Bookmark this — open it 3× a day</p>
+  </div>
+
+  <script>
+    const hour = new Date().getHours();
+    const tod = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
+    document.getElementById('time-label').textContent = 'Good ' + tod;
+
+    let goals = JSON.parse(localStorage.getItem('reflect_goals') || '[]');
+    if (!goals.length) {
+      goals = [
+        { name: 'Write my thesis', doIt: 'I make progress and feel proud', dontIt: 'I fall behind and stress increases' },
+        { name: 'Work out', doIt: 'I feel energised and clear-headed', dontIt: 'I feel sluggish and regret it later' },
+      ];
+    }
+
+    function renderGoals() {
+      const list = document.getElementById('goals-list');
+      list.innerHTML = '';
+      goals.forEach((g, i) => {
+        const block = document.createElement('div');
+        block.className = 'goal-block';
+        block.innerHTML = `
+          <div class="goal-block-header">
+            <span class="goal-num">Goal ${i + 1}</span>
+            <button class="btn-remove" onclick="removeGoal(${i})">Remove</button>
+          </div>
+          <div class="field">
+            <label>What is the goal?</label>
+            <input type="text" value="${escHtml(g.name)}" oninput="goals[${i}].name=this.value" placeholder="e.g. Write my thesis" />
+          </div>
+          <div class="field">
+            <label>If I do it...</label>
+            <textarea rows="2" oninput="goals[${i}].doIt=this.value" placeholder="e.g. I make progress and feel proud">${escHtml(g.doIt)}</textarea>
+          </div>
+          <div class="field">
+            <label>If I don't do it...</label>
+            <textarea rows="2" oninput="goals[${i}].dontIt=this.value" placeholder="e.g. I fall behind and stress piles up">${escHtml(g.dontIt)}</textarea>
+          </div>
+        `;
+        list.appendChild(block);
+      });
+    }
+
+    function escHtml(str) {
+      return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function addGoal() {
+      if (goals.length >= 6) return;
+      goals.push({ name: '', doIt: '', dontIt: '' });
+      renderGoals();
+      const inputs = document.querySelectorAll('#goals-list input[type="text"]');
+      inputs[inputs.length - 1].focus();
+    }
+
+    function removeGoal(i) {
+      goals.splice(i, 1);
+      renderGoals();
+    }
+
+    function showSetup() {
+      document.getElementById('result').style.display = 'none';
+      document.getElementById('setup').style.display = 'block';
+      renderGoals();
+    }
+
+    function saveAndShow() {
+      goals = goals.filter(g => g.name.trim());
+      if (!goals.length) return;
+      localStorage.setItem('reflect_goals', JSON.stringify(goals));
+      showResult();
+    }
+
+    function showResult() {
+      document.getElementById('setup').style.display = 'none';
+      const container = document.getElementById('result-content');
+      container.innerHTML = '';
+      goals.forEach(g => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+          <p class="goal-title">${escHtml(g.name)}</p>
+          <div class="row">
+            <span class="badge badge-do">if I do</span>
+            <p class="row-text">${escHtml(g.doIt) || '—'}</p>
+          </div>
+          <div class="row">
+            <span class="badge badge-dont">if I don't</span>
+            <p class="row-text">${escHtml(g.dontIt) || '—'}</p>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+      document.getElementById('result').style.display = 'block';
+    }
+
+    if (localStorage.getItem('reflect_goals')) {
+      showResult();
+    } else {
+      showSetup();
+    }
+  </script>
+</body>
+</html>
